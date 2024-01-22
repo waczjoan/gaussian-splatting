@@ -92,8 +92,6 @@ class Scene:
                                                            "iteration_" + str(self.loaded_iter),
                                                            "point_cloud.ply"))
             self.gaussians.point_cloud = scene_info.point_cloud
-            if hasattr(gaussians, 'verts_faces'):
-                gaussians.verts_faces()
         else:
             self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
 

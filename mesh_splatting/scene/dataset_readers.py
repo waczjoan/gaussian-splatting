@@ -176,16 +176,6 @@ def readColmapMeshSceneInfo(path, images, eval, num_splats, llffhold=8):
     #except:
     #    pcd = None
 
-    pcd = MeshPointCloud(
-            alpha=alpha,
-            points=xyz,
-            colors=SH2RGB(shs),
-            normals=np.zeros((num_pts, 3)),
-            vertices=vertices,
-            faces=faces,
-            triangles=triangles.cuda()
-        )
-
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,
                            test_cameras=test_cam_infos,
