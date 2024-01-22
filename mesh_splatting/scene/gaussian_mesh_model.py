@@ -20,6 +20,8 @@ class GaussianMeshModel(GaussianModel):
         self._scale = torch.empty(0)
         self.alpha = torch.empty(0)
         self.softmax = torch.nn.Softmax(dim=2)
+        self.vertices = torch.empty(0)
+        self.faces = torch.empty(0)
 
         self.scaling_activation = torch.exp
         self.scaling_inverse_activation = torch.log
@@ -60,6 +62,11 @@ class GaussianMeshModel(GaussianModel):
         self._opacity = nn.Parameter(opacities.requires_grad_(True))
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
 
+    def verts_faces(self):
+        vertices = torch.tensor(self.point_cloud.vertices, device="cuda").float()
+        self.faces = torch.tensor(self.point_cloud.faces).long()
+        self.vertices = nn.Parameter(vertices.requires_grad_(True))
+
     def _calc_xyz(self):
         """
         calculate the 3d Gaussian center in the coordinates xyz.
@@ -71,7 +78,7 @@ class GaussianMeshModel(GaussianModel):
         """
         _xyz = torch.matmul(
             self.alpha,
-            self.point_cloud.triangles
+            self.vertices[self.faces]
         )
         self._xyz = _xyz.reshape(
                 _xyz.shape[0] * _xyz.shape[1], 3
@@ -98,7 +105,7 @@ class GaussianMeshModel(GaussianModel):
             coef = dot(v, u)
             return coef * u
 
-        triangles = self.point_cloud.triangles
+        triangles = self.vertices[self.faces]
         normals = torch.linalg.cross(
             triangles[:, 1] - triangles[:, 0],
             triangles[:, 2] - triangles[:, 0],
@@ -156,6 +163,7 @@ class GaussianMeshModel(GaussianModel):
 
         l = [
             {'params': [self._alpha], 'lr': training_args.alpha_lr, "name": "alpha"},
+            {'params': [self.vertices], 'lr': 0.001, "name": "vertices"},
             {'params': [self._features_dc], 'lr': training_args.feature_lr, "name": "f_dc"},
             {'params': [self._features_rest], 'lr': training_args.feature_lr / 20.0, "name": "f_rest"},
             {'params': [self._opacity], 'lr': training_args.opacity_lr, "name": "opacity"},

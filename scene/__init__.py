@@ -41,7 +41,13 @@ class Scene:
         self.test_cameras = {}
 
         if os.path.exists(os.path.join(args.source_path, "sparse")):
-            scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval)
+            if os.path.exists(os.path.join(args.source_path, "sparse/0/mesh.obj")):
+                print("Found mesh.obj, assuming Colmap_Mesh data set!")
+                scene_info = sceneLoadTypeCallbacks["Colmap_Mesh"](
+                    args.source_path, args.images, args.eval, args.num_splats
+                )
+            else:
+                scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval)
         elif os.path.exists(os.path.join(args.source_path, "transforms_train.json")):
             if os.path.exists(os.path.join(args.source_path, "mesh.obj")):
                 print("Found transforms_train.json file, assuming Blender_Mesh data set!")
@@ -86,6 +92,7 @@ class Scene:
                                                            "iteration_" + str(self.loaded_iter),
                                                            "point_cloud.ply"))
             self.gaussians.point_cloud = scene_info.point_cloud
+            gaussians.verts_faces()
         else:
             self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
 
