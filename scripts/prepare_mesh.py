@@ -66,14 +66,15 @@ def storePly(path, xyz, rgb):
     ply_data = PlyData([vertex_element])
     ply_data.write(path)
 
-xyz, rgb, _ = read_points3D_binary("../data/room/sparse/0/points3D.bin")
-storePly("../data/room/sparse/0/points3D.ply",xyz,rgb)
+for fname in ["room"]:
+    xyz, rgb, _ = read_points3D_binary(f"../data/{fname}/sparse/0/points3D.bin")
+    storePly(f"../data/{fname}/sparse/0/points3D.ply",xyz,rgb)
 
-pcd = o3d.io.read_point_cloud("../data/room/sparse/0/points3D.ply")
-pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+    pcd = o3d.io.read_point_cloud(f"../data/{fname}/sparse/0/points3D.ply")
+    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
 
-mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(pcd, 0.2)
-tri_mesh = trimesh.Trimesh(np.asarray(mesh.vertices), np.asarray(mesh.triangles),
-                          vertex_normals=np.asarray(mesh.vertex_normals))
+    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(pcd, 0.2)
+    tri_mesh = trimesh.Trimesh(np.asarray(mesh.vertices), np.asarray(mesh.triangles),
+                            vertex_normals=np.asarray(mesh.vertex_normals))
 
-trimesh.exchange.export.export_mesh(tri_mesh, '../data/room/sparse/0/mesh.obj')
+    trimesh.exchange.export.export_mesh(tri_mesh, f'../data/{fname}/sparse/0/mesh.obj')
