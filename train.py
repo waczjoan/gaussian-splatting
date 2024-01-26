@@ -225,9 +225,12 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
     parser.add_argument("--save_xyz", action='store_true')
+    parser.add_argument("--num_splats", nargs="+", type=int, default=[])
+    parser.add_argument("--meshes", nargs="+", type=str, default=[])
     args = parser.parse_args(sys.argv[1:])
     args.save_iterations.append(args.iterations)
-    
+    lp.num_splats = args.num_splats
+    lp.meshes = args.meshes
     print("Optimizing " + args.model_path)
 
     # Initialize system state (RNG)

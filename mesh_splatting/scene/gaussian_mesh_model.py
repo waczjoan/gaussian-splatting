@@ -194,7 +194,7 @@ class GaussianMeshModel(GaussianModel):
 
         l = [
             {'params': self._alpha, 'lr': training_args.alpha_lr, "name": "alpha"},
-            {'params': self.vertices, 'lr': 0.001, "name": "vertices"},
+            {'params': self.vertices, 'lr': training_args.vertices_lr, "name": "vertices"},
             {'params': [self._features_dc], 'lr': training_args.feature_lr, "name": "f_dc"},
             {'params': [self._features_rest], 'lr': training_args.feature_lr / 20.0, "name": "f_rest"},
             {'params': [self._opacity], 'lr': training_args.opacity_lr, "name": "opacity"},

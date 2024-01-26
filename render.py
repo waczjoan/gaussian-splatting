@@ -62,7 +62,11 @@ if __name__ == "__main__":
     parser.add_argument("--skip_train", action="store_true")
     parser.add_argument("--skip_test", action="store_true")
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--num_splats", nargs="+", type=int, default=[])
+    parser.add_argument("--meshes", nargs="+", type=str, default=[])
     args = get_combined_args(parser)
+    model.num_splats = args.num_splats
+    model.meshes = args.meshes
     print("Rendering " + args.model_path)
 
     # Initialize system state (RNG)

@@ -104,7 +104,7 @@ def readNerfSyntheticMeshInfo(
                            ply_path=ply_path)
     return scene_info
 
-def readColmapMeshSceneInfo(path, images, eval, num_splats, llffhold=8):
+def readColmapMeshSceneInfo(path, images, eval, num_splats, meshes, llffhold=8):
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
         cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
@@ -120,16 +120,6 @@ def readColmapMeshSceneInfo(path, images, eval, num_splats, llffhold=8):
     cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir))
     cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
 
-    mesh_scene = trimesh.load(f'{path}/sparse/0/mesh.obj', force='mesh')
-    vertices = mesh_scene.vertices
-    faces = mesh_scene.faces
-    triangles = torch.tensor(mesh_scene.triangles).float()  # equal vertices[faces]
-
-    mesh_scene2 = trimesh.load(f'{path}/sparse/0/mesh_gs2.obj', force='mesh')
-    vertices2 = mesh_scene2.vertices
-    faces2 = mesh_scene2.faces
-    triangles2 = torch.tensor(mesh_scene2.triangles).float()  # equal vertices[faces]
-
     if eval:
         train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
         test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
@@ -139,78 +129,63 @@ def readColmapMeshSceneInfo(path, images, eval, num_splats, llffhold=8):
 
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
-    ply_path = os.path.join(path, "points3d.ply")
-    # if not os.path.exists(ply_path):
     if True:
-        # Since this data set has no colmap data, we start with random points
-        num_pts_each_triangle = num_splats
-        num_pts = num_pts_each_triangle * triangles.shape[0]
-        num_pts_each_triangle2 = 3
-        num_pts2 = num_pts_each_triangle2 * triangles2.shape[0]
-        print(
-            f"Generating random point cloud ({num_pts+num_pts2})..."
-        )
+        pcds = []
+        ply_paths = []
+        total_pts = 0
+        for i, (mesh, num) in enumerate(zip(meshes, num_splats)):
+            ply_path = os.path.join(path, f"points3d_{i}.ply")
 
-        # We create random points inside the bounds traingles
-        alpha = torch.rand(
-            triangles.shape[0],
-            num_pts_each_triangle,
-            3
-        )
+            mesh_scene = trimesh.load(f'{path}/sparse/0/{mesh}.obj', force='mesh')
+            vertices = mesh_scene.vertices
+            faces = mesh_scene.faces
+            triangles = torch.tensor(mesh_scene.triangles).float()  # equal vertices[faces]
 
-        xyz = torch.matmul(
-            alpha,
-            triangles
-        )
-        xyz = xyz.reshape(num_pts, 3)
+            num_pts_each_triangle = num
+            num_pts = num_pts_each_triangle * triangles.shape[0]
+            total_pts += num_pts
 
-        shs = np.random.random((num_pts, 3)) / 255.0
+            # We create random points inside the bounds traingles
+            alpha = torch.rand(
+                triangles.shape[0],
+                num_pts_each_triangle,
+                3
+            )
 
-        alpha2 = torch.rand(
-            triangles2.shape[0],
-            num_pts_each_triangle2,
-            3
-        )
+            xyz = torch.matmul(
+                alpha,
+                triangles
+            )
+            xyz = xyz.reshape(num_pts, 3)
 
-        xyz2 = torch.matmul(
-            alpha2,
-            triangles2
-        )
-        xyz2 = xyz2.reshape(num_pts2, 3)
+            shs = np.random.random((num_pts, 3)) / 255.0
 
-        shs2 = np.random.random((num_pts2, 3)) / 255.0
-
-        pcd = MeshPointCloud(
-            alpha=alpha,
-            points=xyz,
-            colors=SH2RGB(shs),
-            normals=np.zeros((num_pts, 3)),
-            vertices=vertices,
-            faces=faces,
-            triangles=triangles.cuda()
-        )
-        pcd2 = MeshPointCloud(
-            alpha=alpha2,
-            points=xyz2,
-            colors=SH2RGB(shs2),
-            normals=np.zeros((num_pts2, 3)),
-            vertices=vertices2,
-            faces=faces2,
-            triangles=triangles2.cuda()
-        )
-
-        storePly(ply_path, pcd.points, SH2RGB(shs) * 255)
-        storePly(ply_path+'2', pcd2.points, SH2RGB(shs2) * 255)
+            pcd = MeshPointCloud(
+                alpha=alpha,
+                points=xyz,
+                colors=SH2RGB(shs),
+                normals=np.zeros((num_pts, 3)),
+                vertices=vertices,
+                faces=faces,
+                triangles=triangles.cuda()
+            )
+            pcds.append(pcd)
+            ply_paths.append(ply_path)
+            storePly(ply_path, pcd.points, SH2RGB(shs) * 255)
+    
+    print(
+        f"Generating random point cloud ({total_pts})..."
+    )
     #try:
     #    pcd = fetchPly(ply_path)
     #except:
     #    pcd = None
 
-    scene_info = SceneInfo(point_cloud=[pcd, pcd2],
+    scene_info = SceneInfo(point_cloud=pcds,
                            train_cameras=train_cam_infos,
                            test_cameras=test_cam_infos,
                            nerf_normalization=nerf_normalization,
-                           ply_path=[ply_path, ply_path+'2'])
+                           ply_path=ply_paths)
     
     return scene_info
 
