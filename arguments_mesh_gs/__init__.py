@@ -29,4 +29,5 @@ class OptimizationParamsMesh(ParamGroup):
         self.densify_grad_threshold = 0.0002
         self.random_background = False
         self.use_mesh = True
+        self.vertices_lr = 0.001
         super().__init__(parser, "Optimization Parameters")
