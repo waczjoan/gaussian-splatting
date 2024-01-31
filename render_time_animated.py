@@ -21,7 +21,6 @@ from utils.general_utils import safe_state
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
 from mesh_splatting.scene.gaussian_mesh_model import GaussianMeshModel
-from sklearn.cluster import KMeans
 
 def transform_vertices_function(vertices, c=1):
     vertices = vertices[:, [0, 2, 1]]
@@ -82,13 +81,14 @@ def render_set(mesh_scene, model_path, name, iteration, views, gaussians, pipeli
         idxs = None
 
     for idx, view in enumerate(tqdm(views, desc="Rendering progress")):
-        if idx == 0:
-            view_1 = view
-        new_vertices = transform_hotdog_fly(vertices, t[idx], idxs)
+        # if idx == 0:
+        #     view_1 = view
+        # new_vertices = transform_hotdog_fly(vertices, t[idx], idxs)
+        new_vertices = vertices
         triangles = new_vertices[torch.tensor(mesh_scene.faces).long()].float().cuda()
-        if idx == 106:
-            torch.save(new_vertices, f'{render_path}test_vertices.pt')
-            torch.save(torch.tensor(mesh_scene.faces).long(), f'{render_path}test_faces.pt')
+        # if idx == 106:
+        #     torch.save(new_vertices, f'{render_path}test_vertices.pt')
+        #     torch.save(torch.tensor(mesh_scene.faces).long(), f'{render_path}test_faces.pt')
         rendering = render(idxs, triangles, view, gaussians, pipeline, background)["render"]
         gt = view.original_image[0:3, :, :]
         torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
