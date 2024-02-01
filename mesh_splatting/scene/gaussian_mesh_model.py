@@ -27,6 +27,8 @@ class GaussianMeshModel(GaussianModel):
 
     @property
     def get_xyz(self):
+        # self.update_alpha()
+        # self.prepare_scaling_rot()
         return self._xyz
 
     def create_from_pcd(self, pcd: MeshPointCloud, spatial_lr_scale: float):
@@ -124,6 +126,7 @@ class GaussianMeshModel(GaussianModel):
         )
         rotation = torch.stack((v0, v1, v2), dim=1).unsqueeze(dim=1)
         rotation = rotation.broadcast_to((*self.alpha.shape[:2], 3, 3)).flatten(start_dim=0, end_dim=1)
+        rotation = rotation.transpose(-2, -1)
         self._rotation = rot_to_quat_batch(rotation)
 
     def update_alpha(self):

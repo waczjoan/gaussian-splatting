@@ -37,22 +37,106 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_test : bool):
     with torch.no_grad():
+        gaussians = []
         gaussians1 = GaussianMultiMeshModel(dataset.sh_degree)
         scene = Scene(dataset, gaussians1, load_iteration=iteration, shuffle=False)
         if hasattr(gaussians1, 'update_alpha'):
             gaussians1.update_alpha()
         if hasattr(gaussians1, 'prepare_scaling_rot'):
             gaussians1.prepare_scaling_rot()
+        gaussians.append(gaussians1)
 
-        gaussians2 = GaussianMeshModel(dataset.sh_degree)
-        dataset.model_path = "output/ficus/20"
-        dataset.source_path = "/home/pieczo/forks/gaussian-splatting/data/ficus"
+        # gaussians2 = GaussianMeshModel(dataset.sh_degree)
+        # dataset.model_path = "output/ficus/10_w"
+        # dataset.source_path = "/home/pieczo/forks/gaussian-splatting/data/ficus"
+        # dataset.white_background = True
+        # dataset.num_splats = [10]
+        # dataset.meshes = ["mesh"]
+        # _ = Scene(dataset, gaussians2, load_iteration=iteration, shuffle=False)
+        # dataset.white_background = False
+        # dataset.model_path = scene.model_path
+        # gaussians.append(gaussians2)
+
+        # gaussians3 = GaussianMeshModel(dataset.sh_degree)
+        # dataset.model_path = "output/ficus/20"
+        # dataset.source_path = "/home/pieczo/forks/gaussian-splatting/data/ficus"
+        # dataset.white_background = True
+        # dataset.num_splats = [20]
+        # dataset.meshes = ["teaser2"]
+        # _ = Scene(dataset, gaussians3, load_iteration=iteration, shuffle=False)
+        # dataset.white_background = False
+        # dataset.model_path = scene.model_path
+        # gaussians.append(gaussians3)
+
+        # gaussians4 = GaussianMeshModel(dataset.sh_degree)
+        # dataset.model_path = "output/ficus/20"
+        # dataset.source_path = "/home/pieczo/forks/gaussian-splatting/data/ficus"
+        # dataset.white_background = True
+        # dataset.num_splats = [20]
+        # dataset.meshes = ["teaser2"]
+        # _ = Scene(dataset, gaussians4, load_iteration=iteration, shuffle=False)
+        # dataset.white_background = False
+        # dataset.model_path = scene.model_path
+        # gaussians.append(gaussians4)
+
+        # gaussians5 = GaussianMeshModel(dataset.sh_degree)
+        # dataset.model_path = "output/ficus/20"
+        # dataset.source_path = "/home/pieczo/forks/gaussian-splatting/data/ficus"
+        # dataset.white_background = True
+        # dataset.num_splats = [20]
+        # dataset.meshes = ["teaser3"]
+        # _ = Scene(dataset, gaussians5, load_iteration=iteration, shuffle=False)
+        # dataset.white_background = False
+        # dataset.model_path = scene.model_path
+        # gaussians.append(gaussians5)
+        
+        # gaussians6 = GaussianMeshModel(dataset.sh_degree)
+        # dataset.model_path = "output/ficus/20"
+        # dataset.source_path = "/home/pieczo/forks/gaussian-splatting/data/ficus"
+        # dataset.white_background = True
+        # dataset.num_splats = [20]
+        # dataset.meshes = ["teaser4"]
+        # _ = Scene(dataset, gaussians6, load_iteration=iteration, shuffle=False)
+        # dataset.white_background = False
+        # dataset.model_path = scene.model_path
+        # gaussians.append(gaussians6)     
+
+        gaussians7 = GaussianMeshModel(dataset.sh_degree)
+        dataset.model_path = "output/hotdog/animate_white"
+        dataset.source_path = "/home/pieczo/forks/gaussian-splatting/data/hotdog"
         dataset.white_background = True
         dataset.num_splats = [20]
-        scene2 = Scene(dataset, gaussians2, load_iteration=iteration, shuffle=False)
+        dataset.meshes = ["teaser5"]
+        _ = Scene(dataset, gaussians7, load_iteration=iteration, shuffle=False)
         dataset.white_background = False
         dataset.model_path = scene.model_path
-        gaussians = [gaussians1, gaussians2]
+        gaussians.append(gaussians7)
+
+        gaussians8 = GaussianMeshModel(dataset.sh_degree)
+        dataset.model_path = "output/lego/white_animate"
+        dataset.source_path = "/home/pieczo/forks/gaussian-splatting/data/lego"
+        dataset.white_background = True
+        dataset.num_splats = [1]
+        dataset.meshes = ["teaser6"]
+        _ = Scene(dataset, gaussians8, load_iteration=iteration, shuffle=False)
+        dataset.white_background = False
+        dataset.model_path = scene.model_path
+        gaussians.append(gaussians8)
+
+        gaussians9 = GaussianMeshModel(dataset.sh_degree)
+        dataset.model_path = "output/lego/white_animate"
+        dataset.source_path = "/home/pieczo/forks/gaussian-splatting/data/lego"
+        dataset.white_background = True
+        dataset.num_splats = [1]
+        dataset.meshes = ["teaser7"]
+        _ = Scene(dataset, gaussians9, load_iteration=iteration, shuffle=False)
+        dataset.white_background = False
+        dataset.model_path = scene.model_path
+        gaussians.append(gaussians9)
+        for g in gaussians:
+            g.update_alpha()
+            g.prepare_scaling_rot()
+        # gaussians = [gaussians1, gaussians2, gaussians3, gaussians4, gaussians5, gaussians6, gaussians7, gaussians8]
 
         bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")

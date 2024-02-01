@@ -30,14 +30,14 @@ softmax = torch.nn.Softmax(dim=2)
 
 
 def readNerfSyntheticMeshInfo(
-        path, white_background, eval, num_splats, extension=".png"
+        path, white_background, eval, num_splats, mesh="mesh", extension=".png"
 ):
     print("Reading Training Transforms")
     train_cam_infos = readCamerasFromTransforms(path, "transforms_train.json", white_background, extension)
     print("Reading Test Transforms")
     test_cam_infos = readCamerasFromTransforms(path, "transforms_test.json", white_background, extension)
     print("Reading Mesh object")
-    mesh_scene = trimesh.load(f'{path}/mesh.obj', force='mesh')
+    mesh_scene = trimesh.load(f'{path}/{mesh}.obj', force='mesh')
     # mesh_scene = trimesh.load(f'{path}/mesh_120.obj', force='mesh')
     vertices = mesh_scene.vertices
     vertices = vertices[:, [0, 2, 1]]
