@@ -58,15 +58,23 @@ def render(idxs, triangles, viewpoint_camera, pc: GaussianModel, pipe, bg_color:
     # modi[:, 2] -= 0.25
     # modi[:, 2] += self._xyz[:, 0]
     # modi[:, 0] -= 0.01
-
-    triangles_new = triangles.clone()
-    triangles_new *= 0.75
-    triangles_new[:, :, 2] -= 0.25
-    triangles_new[:, :, 1] -= 0.05
-    # triangles_new[:, :, 2] += triangles[:, :, 0]
-    triangles = torch.concat((triangles, triangles_new))
+    import numpy as np
+    n = 5
+    triangles_list = []
+    r = 0.7
+    for i in range(1, n + 1):
+        theta = 2 * torch.pi * i / n
+        triangles_new = triangles.clone()
+        # triangles_new *= i / n
+        x = triangles_new[:, :, 0] + r
+        y = triangles_new[:, :, 1] + r
+        triangles_new[:, :, 0] = x * np.cos(theta) - y * np.sin(theta)
+        triangles_new[:, :, 1] = x * np.sin(theta) + y * np.cos(theta)
+        triangles_list.append(triangles_new)
+    
+    triangles = torch.cat(triangles_list)
     alpha = pc.alpha
-    pc.alpha = torch.concat((pc.alpha, pc.alpha))
+    pc.alpha = torch.cat([alpha for _ in range(n)])
     _xyz = torch.matmul(
         pc.alpha,
         triangles
@@ -77,12 +85,10 @@ def render(idxs, triangles, viewpoint_camera, pc: GaussianModel, pipe, bg_color:
 
     means3D = _xyz
     means2D = screenspace_points
-    new_opacity = pc.get_opacity
-    # new_opacity[:2_000_000] *= 0.0
-    opacity = torch.concat((pc.get_opacity, new_opacity))
+    opacity = torch.cat([pc.get_opacity for _ in range(n)])
     pc.triangles= triangles
     scal = pc._scale
-    pc._scale = torch.concat((pc._scale, pc._scale))
+    pc._scale = torch.cat([pc._scale for _ in range(n)])
     pc.prepare_scaling_rot()
     pc._scale = scal
     pc.alpha = alpha
@@ -96,9 +102,9 @@ def render(idxs, triangles, viewpoint_camera, pc: GaussianModel, pipe, bg_color:
         cov3D_precomp = pc.get_covariance(scaling_modifier)
     else:
         scales = pc.get_scaling
-        scales = torch.concat((scales, scales))
+        scales = torch.cat([scales for _ in range(n)])
         rotations = pc.get_rotation
-        rotations = torch.concat((rotations, rotations))
+        rotations = torch.cat([rotations for _ in range(n)])
 
     # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
     # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
@@ -113,7 +119,7 @@ def render(idxs, triangles, viewpoint_camera, pc: GaussianModel, pipe, bg_color:
             colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
         else:
             shs = pc.get_features
-            shs = torch.concat((shs, shs))
+            shs = torch.cat([shs for _ in range(n)])
     else:
         colors_precomp = override_color
 
