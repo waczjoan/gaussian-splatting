@@ -20,8 +20,6 @@ class GaussianMeshModel(GaussianModel):
         self._scale = torch.empty(0)
         self.alpha = torch.empty(0)
         self.softmax = torch.nn.Softmax(dim=2)
-        self.vertices = torch.empty(0)
-        self.faces = torch.empty(0)
 
         self.scaling_activation = torch.exp
         self.scaling_inverse_activation = torch.log
@@ -35,53 +33,32 @@ class GaussianMeshModel(GaussianModel):
 
         self.point_cloud = pcd
         self.spatial_lr_scale = spatial_lr_scale
-        self._alpha = []
-        self._features_dc = []
-        self._features_rest = []
-        self._scale = []
-        self._opacity = []
-        max_radii2D = 0
-        for p in pcd:
-            pcd_alpha_shape = p.alpha.shape
+        pcd_alpha_shape = pcd.alpha.shape
 
-            print("Number of faces: ", pcd_alpha_shape[0])
-            print("Number of points at initialisation in face: ", pcd_alpha_shape[1])
+        print("Number of faces: ", pcd_alpha_shape[0])
+        print("Number of points at initialisation in face: ", pcd_alpha_shape[1])
 
-            alpha_point_cloud = p.alpha.float().cuda()
-            scale = torch.ones((p.points.shape[0], 1)).float().cuda()
+        alpha_point_cloud = pcd.alpha.float().cuda()
+        scale = torch.ones((pcd.points.shape[0], 1)).float().cuda()
 
-            print("Number of points at initialisation : ",
-                alpha_point_cloud.shape[0] * alpha_point_cloud.shape[1])
+        print("Number of points at initialisation : ",
+              alpha_point_cloud.shape[0] * alpha_point_cloud.shape[1])
 
-            fused_color = RGB2SH(torch.tensor(np.asarray(p.colors)).float().cuda())
-            features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().cuda()
-            features[:, :3, 0] = fused_color
-            features[:, 3:, 1:] = 0.0
+        fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().cuda())
+        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().cuda()
+        features[:, :3, 0] = fused_color
+        features[:, 3:, 1:] = 0.0
 
-            opacities = inverse_sigmoid(0.1 * torch.ones((p.points.shape[0], 1), dtype=torch.float, device="cuda"))
+        opacities = inverse_sigmoid(0.1 * torch.ones((pcd.points.shape[0], 1), dtype=torch.float, device="cuda"))
 
-            self._alpha.append(nn.Parameter(alpha_point_cloud.requires_grad_(True)))  # check update_alpha
-            self._features_dc.append(features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True))
-            self._features_rest.append(features[:, :, 1:].transpose(1, 2).contiguous().requires_grad_(True))
-            self._scale.append(nn.Parameter(scale.requires_grad_(True)))
-            self._opacity.append(opacities.requires_grad_(True))
-            max_radii2D += p.points.shape[0]
-            
-        self._opacity = nn.Parameter(torch.cat(self._opacity))
-        self._features_dc = nn.Parameter(torch.cat(self._features_dc))
-        self._features_rest = nn.Parameter(torch.cat(self._features_rest))
-        self.max_radii2D = torch.zeros((max_radii2D), device="cuda")
-        self.verts_faces()
+        self._alpha = nn.Parameter(alpha_point_cloud.requires_grad_(True))  # check update_alpha
         self.update_alpha()
+        self._features_dc = nn.Parameter(features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True))
+        self._features_rest = nn.Parameter(features[:, :, 1:].transpose(1, 2).contiguous().requires_grad_(True))
+        self._scale = nn.Parameter(scale.requires_grad_(True))
         self.prepare_scaling_rot()
-
-    def verts_faces(self):
-        self.vertices = []
-        self.faces = []
-        for p in self.point_cloud:
-            vertices = torch.tensor(p.vertices, device="cuda").float()
-            self.faces.append(torch.tensor(p.faces).long())
-            self.vertices.append(nn.Parameter(vertices.requires_grad_(True)))
+        self._opacity = nn.Parameter(opacities.requires_grad_(True))
+        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
 
     def _calc_xyz(self):
         """
@@ -92,18 +69,13 @@ class GaussianMeshModel(GaussianModel):
         the triangles forming the mesh.
 
         """
-        self._xyz = []
-        for alpha, vertices, faces in zip(self.alpha, self.vertices, self.faces):
-            _xyz = torch.matmul(
-                alpha,
-                vertices[faces]
+        _xyz = torch.matmul(
+            self.alpha,
+            self.point_cloud.triangles
+        )
+        self._xyz = _xyz.reshape(
+                _xyz.shape[0] * _xyz.shape[1], 3
             )
-            self._xyz.append(
-                _xyz.reshape(
-                    _xyz.shape[0] * _xyz.shape[1], 3
-                )
-            )
-        self._xyz = torch.cat(self._xyz)
         
     def prepare_scaling_rot(self, eps=1e-8):
         """
@@ -126,39 +98,33 @@ class GaussianMeshModel(GaussianModel):
             coef = dot(v, u)
             return coef * u
 
-        self._scaling = []
-        self._rotation = []
-        for i, (vertices, faces) in enumerate(zip(self.vertices, self.faces)):
-            triangles = vertices[faces]
-            normals = torch.linalg.cross(
-                triangles[:, 1] - triangles[:, 0],
-                triangles[:, 2] - triangles[:, 0],
-                dim=1
-            )
-            v0 = normals / (torch.linalg.vector_norm(normals, dim=-1, keepdim=True) + eps)
-            means = torch.mean(triangles, dim=1)
-            v1 = triangles[:, 1] - means
-            v1_norm = torch.linalg.vector_norm(v1, dim=-1, keepdim=True) + eps
-            v1 = v1 / v1_norm
-            v2_init = triangles[:, 2] - means
-            v2 = v2_init - proj(v2_init, v0) - proj(v2_init, v1) # Gram-Schmidt
-            v2 = v2 / (torch.linalg.vector_norm(v2, dim=-1, keepdim=True) + eps)
+        triangles = self.point_cloud.triangles
+        normals = torch.linalg.cross(
+            triangles[:, 1] - triangles[:, 0],
+            triangles[:, 2] - triangles[:, 0],
+            dim=1
+        )
+        v0 = normals / (torch.linalg.vector_norm(normals, dim=-1, keepdim=True) + eps)
+        means = torch.mean(triangles, dim=1)
+        v1 = triangles[:, 1] - means
+        v1_norm = torch.linalg.vector_norm(v1, dim=-1, keepdim=True) + eps
+        v1 = v1 / v1_norm
+        v2_init = triangles[:, 2] - means
+        v2 = v2_init - proj(v2_init, v0) - proj(v2_init, v1) # Gram-Schmidt
+        v2 = v2 / (torch.linalg.vector_norm(v2, dim=-1, keepdim=True) + eps)
 
-            s1 = v1_norm / 2.
-            s2 = dot(v2_init, v2) / 2.
-            s0 = eps * torch.ones_like(s1)
-            scales = torch.concat((s0, s1, s2), dim=1).unsqueeze(dim=1)
-            scales = scales.broadcast_to((*self.alpha[i].shape[:2], 3))
-            # self._scaling = torch.log(scales.flatten(start_dim=0, end_dim=1))
-            self._scaling.append(torch.log(
-                torch.nn.functional.relu(self._scale[i] * scales.flatten(start_dim=0, end_dim=1)) + eps
-            ))
-            rotation = torch.stack((v0, v1, v2), dim=1).unsqueeze(dim=1)
-            rotation = rotation.broadcast_to((*self.alpha[i].shape[:2], 3, 3)).flatten(start_dim=0, end_dim=1)
-            self._rotation.append(rot_to_quat_batch(rotation))
-
-        self._scaling = torch.cat(self._scaling)
-        self._rotation = torch.cat(self._rotation)
+        s1 = v1_norm / 2.
+        s2 = dot(v2_init, v2) / 2.
+        s0 = eps * torch.ones_like(s1)
+        scales = torch.concat((s0, s1, s2), dim=1).unsqueeze(dim=1)
+        scales = scales.broadcast_to((*self.alpha.shape[:2], 3))
+        # self._scaling = torch.log(scales.flatten(start_dim=0, end_dim=1))
+        self._scaling = torch.log(
+            torch.nn.functional.relu(self._scale * scales.flatten(start_dim=0, end_dim=1)) + eps
+        )
+        rotation = torch.stack((v0, v1, v2), dim=1).unsqueeze(dim=1)
+        rotation = rotation.broadcast_to((*self.alpha.shape[:2], 3, 3)).flatten(start_dim=0, end_dim=1)
+        self._rotation = rot_to_quat_batch(rotation)
 
     def update_alpha(self):
         """
@@ -179,26 +145,21 @@ class GaussianMeshModel(GaussianModel):
         # self.alpha = self.alpha / self.alpha.sum(dim=-1, keepdim=True)
 
         """
-        self.alpha = []
-        for alpha in self._alpha:
-            alpha = torch.relu(alpha) + 1e-8
-            self.alpha.append(alpha / alpha.sum(dim=-1, keepdim=True))
+        self.alpha = torch.relu(self._alpha) + 1e-8
+        self.alpha = self.alpha / self.alpha.sum(dim=-1, keepdim=True)
+        # self.alpha = self.update_alpha_func(self._alpha)
         self._calc_xyz()
 
     def training_setup(self, training_args):
         self.percent_dense = training_args.percent_dense
-        s = 0
-        for xyz in self.get_xyz:
-            s += xyz.shape[0]
-        self.denom = torch.zeros((s, 1), device="cuda")
+        self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
 
         l = [
-            {'params': self._alpha, 'lr': training_args.alpha_lr, "name": "alpha"},
-            {'params': self.vertices, 'lr': training_args.vertices_lr, "name": "vertices"},
+            {'params': [self._alpha], 'lr': training_args.alpha_lr, "name": "alpha"},
             {'params': [self._features_dc], 'lr': training_args.feature_lr, "name": "f_dc"},
             {'params': [self._features_rest], 'lr': training_args.feature_lr / 20.0, "name": "f_rest"},
             {'params': [self._opacity], 'lr': training_args.opacity_lr, "name": "opacity"},
-            {'params': self._scale, 'lr': training_args.scaling_lr, "name": "scaling"}
+            {'params': [self._scale], 'lr': training_args.scaling_lr, "name": "scaling"}
         ]
 
         self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
@@ -215,15 +176,11 @@ class GaussianMeshModel(GaussianModel):
             '_alpha', 
             '_scale',
             'point_cloud',
-            'vertices',
-            'faces'
         ]
 
         save_dict = {}
         for attr_name in additional_attrs:
-            save_dict[attr_name] = []
-            for m in attrs[attr_name]:
-                save_dict[attr_name].append(m)
+            save_dict[attr_name] = attrs[attr_name]
 
         path_model = path.replace('point_cloud.ply', 'model_params.pt')
         torch.save(save_dict, path_model)
@@ -234,13 +191,9 @@ class GaussianMeshModel(GaussianModel):
         params = torch.load(path_model)
         alpha = params['_alpha']
         scale = params['_scale']
-        vertices = params['vertices']
-        faces = params['faces']
         # point_cloud = params['point_cloud']
-        self._alpha = [nn.Parameter(a) for a in alpha]
-        self._scale = [nn.Parameter(s) for s in scale]
-        self.vertices = [nn.Parameter(v) for v in vertices]
-        self.faces = faces
+        self._alpha = nn.Parameter(alpha)
+        self._scale = nn.Parameter(scale)
         # self.point_cloud = point_cloud
         # self.update_alpha()
         # self.prepare_scaling_rot()

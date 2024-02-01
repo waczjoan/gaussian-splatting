@@ -19,8 +19,8 @@ import torchvision
 from utils.general_utils import safe_state
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
-from gaussian_renderer import GaussianModel
 from mesh_splatting.scene.gaussian_mesh_model import GaussianMeshModel
+from multi_mesh_splatting.scene.gaussian_multi_mesh_model import GaussianMultiMeshModel
 
 def render_set(model_path, name, iteration, views, gaussians, pipeline, background):
     render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
@@ -37,12 +37,22 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_test : bool):
     with torch.no_grad():
-        gaussians = GaussianMeshModel(dataset.sh_degree)
-        scene = Scene(dataset, gaussians, load_iteration=iteration, shuffle=False)
-        if hasattr(gaussians, 'update_alpha'):
-            gaussians.update_alpha()
-        if hasattr(gaussians, 'prepare_scaling_rot'):
-            gaussians.prepare_scaling_rot()
+        gaussians1 = GaussianMultiMeshModel(dataset.sh_degree)
+        scene = Scene(dataset, gaussians1, load_iteration=iteration, shuffle=False)
+        if hasattr(gaussians1, 'update_alpha'):
+            gaussians1.update_alpha()
+        if hasattr(gaussians1, 'prepare_scaling_rot'):
+            gaussians1.prepare_scaling_rot()
+
+        gaussians2 = GaussianMeshModel(dataset.sh_degree)
+        dataset.model_path = "output/ficus/20"
+        dataset.source_path = "/home/pieczo/forks/gaussian-splatting/data/ficus"
+        dataset.white_background = True
+        dataset.num_splats = [20]
+        scene2 = Scene(dataset, gaussians2, load_iteration=iteration, shuffle=False)
+        dataset.white_background = False
+        dataset.model_path = scene.model_path
+        gaussians = [gaussians1, gaussians2]
 
         bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
@@ -51,7 +61,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
              render_set(dataset.model_path, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background)
 
         if not skip_test:
-             render_set(dataset.model_path, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background)
+             render_set(dataset.model_path, "composition", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline, background)
 
 if __name__ == "__main__":
     # Set up command line argument parser

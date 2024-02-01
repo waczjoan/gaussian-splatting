@@ -13,7 +13,7 @@ import os
 import random
 import json
 from utils.system_utils import searchForMaxIteration
-from mesh_splatting.scene.dataset_readers import sceneLoadTypeCallbacks
+from multi_mesh_splatting.scene.dataset_readers import sceneLoadTypeCallbacks
 from scene.gaussian_model import GaussianModel
 from arguments import ModelParams
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
@@ -39,7 +39,7 @@ class Scene:
 
         self.train_cameras = {}
         self.test_cameras = {}
-
+        # print("XDDDD", args.model_path, args.source_path)
         if os.path.exists(os.path.join(args.source_path, "sparse")):
             if os.path.exists(os.path.join(args.source_path, "sparse/0/mesh.obj")):
                 print("Found mesh.obj, assuming Colmap_Mesh data set!")
