@@ -16,7 +16,7 @@ from utils.loss_utils import l1_loss, ssim
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
-from mesh_splatting.scene.gaussian_mesh_model import GaussianMeshModel
+from multi_mesh_splatting.scene.gaussian_multi_mesh_model import GaussianMultiMeshModel
 from utils.general_utils import safe_state
 import uuid
 from tqdm import tqdm
@@ -35,7 +35,7 @@ except ImportError:
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, save_xyz):
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
-    gaussians = GaussianMeshModel(dataset.sh_degree)
+    gaussians = GaussianMultiMeshModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
     if checkpoint:
@@ -115,19 +115,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if (iteration in saving_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
-
-            # Densification
-            # if iteration < opt.densify_until_iter:
-            #    # Keep track of max radii in image-space for pruning
-            #    gaussians.max_radii2D[visibility_filter] = torch.max(gaussians.max_radii2D[visibility_filter], radii[visibility_filter])
-            #    gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
-
-            #    if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
-            #        size_threshold = 20 if iteration > opt.opacity_reset_interval else None
-            #        gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, scene.cameras_extent, size_threshold)
-                
-            #    if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
-            #        gaussians.reset_opacity()
 
             # Optimizer step
             if iteration < opt.iterations:
@@ -209,8 +196,8 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
     lp = ModelParams(parser)
-    gs_type = "Mesh_gs"
-    if gs_type == "Mesh_gs":
+    gs_type = "gs_multi_mesh"
+    if gs_type == "gs_multi_mesh":
         op = OptimizationParamsMesh(parser)
     else:
         op = OptimizationParams(parser)

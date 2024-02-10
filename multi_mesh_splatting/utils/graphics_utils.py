@@ -3,7 +3,7 @@ import torch
 from typing import NamedTuple
 
 
-class MeshPointCloud(NamedTuple):
+class MultiMeshPointCloud(NamedTuple):
     alpha: torch.Tensor
     points: torch.Tensor
     colors: np.array

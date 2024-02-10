@@ -20,7 +20,7 @@ from utils.general_utils import safe_state
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel
-from mesh_splatting.scene.gaussian_mesh_model import GaussianMeshModel
+from multi_mesh_splatting.scene.gaussian_multi_mesh_model import GaussianMultiMeshModel
 
 def render_set(model_path, name, iteration, views, gaussians, pipeline, background):
     render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
@@ -37,7 +37,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_test : bool):
     with torch.no_grad():
-        gaussians = GaussianMeshModel(dataset.sh_degree)
+        gaussians = GaussianMultiMeshModel(dataset.sh_degree)
         scene = Scene(dataset, gaussians, load_iteration=iteration, shuffle=False)
         if hasattr(gaussians, 'update_alpha'):
             gaussians.update_alpha()

@@ -7,10 +7,10 @@ from scene.gaussian_model import GaussianModel
 from simple_knn._C import distCUDA2
 from utils.general_utils import inverse_sigmoid, rot_to_quat_batch
 from utils.sh_utils import RGB2SH
-from mesh_splatting.utils.graphics_utils import MeshPointCloud
+from multi_mesh_splatting.utils.graphics_utils import MultiMeshPointCloud
 
 
-class GaussianMeshModel(GaussianModel):
+class GaussianMultiMeshModel(GaussianModel):
 
     def __init__(self, sh_degree: int):
 
@@ -31,7 +31,7 @@ class GaussianMeshModel(GaussianModel):
     def get_xyz(self):
         return self._xyz
 
-    def create_from_pcd(self, pcd: MeshPointCloud, spatial_lr_scale: float):
+    def create_from_pcd(self, pcd: MultiMeshPointCloud, spatial_lr_scale: float):
 
         self.point_cloud = pcd
         self.spatial_lr_scale = spatial_lr_scale
@@ -93,7 +93,7 @@ class GaussianMeshModel(GaussianModel):
 
         """
         self._xyz = []
-        for alpha, vertices, faces in zip(self.alpha, self.vertices, self.faces):
+        for i, (alpha, vertices, faces) in enumerate(zip(self.alpha, self.vertices, self.faces)):
             _xyz = torch.matmul(
                 alpha,
                 vertices[faces]
@@ -149,12 +149,12 @@ class GaussianMeshModel(GaussianModel):
             s0 = eps * torch.ones_like(s1)
             scales = torch.concat((s0, s1, s2), dim=1).unsqueeze(dim=1)
             scales = scales.broadcast_to((*self.alpha[i].shape[:2], 3))
-            # self._scaling = torch.log(scales.flatten(start_dim=0, end_dim=1))
             self._scaling.append(torch.log(
                 torch.nn.functional.relu(self._scale[i] * scales.flatten(start_dim=0, end_dim=1)) + eps
             ))
             rotation = torch.stack((v0, v1, v2), dim=1).unsqueeze(dim=1)
             rotation = rotation.broadcast_to((*self.alpha[i].shape[:2], 3, 3)).flatten(start_dim=0, end_dim=1)
+            rotation = rotation.transpose(-2, -1)
             self._rotation.append(rot_to_quat_batch(rotation))
 
         self._scaling = torch.cat(self._scaling)
@@ -236,11 +236,8 @@ class GaussianMeshModel(GaussianModel):
         scale = params['_scale']
         vertices = params['vertices']
         faces = params['faces']
-        # point_cloud = params['point_cloud']
         self._alpha = [nn.Parameter(a) for a in alpha]
         self._scale = [nn.Parameter(s) for s in scale]
         self.vertices = [nn.Parameter(v) for v in vertices]
         self.faces = faces
-        # self.point_cloud = point_cloud
-        # self.update_alpha()
-        # self.prepare_scaling_rot()
+
